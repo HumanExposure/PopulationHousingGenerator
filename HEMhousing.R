@@ -1,6 +1,6 @@
 # HEM housing generator
 # Designed and written by WGG at ICF
-# Last modified on Nov 17, 2016
+# Last modified on Apr 5, 2017
 
 
 
@@ -53,7 +53,18 @@ match.pop.housing = function(pop,ahsname=NULL,recsname=NULL) {
       recsvars[x] <- z[rows.z]
     } 
   }
-  return(cbind(pop,ahsvars,recsvars))
+  region <- ceiling(pop$pool/72)
+  p1     <- pop$pool-72*(region-1)
+  ru     <- ifelse(p1>36,"U","R")
+  p2     <- ifelse(ru=="U",p1-36,p1)
+  house  <- ceiling(p2/12)
+  p3     <- p2-12*(house-1)
+  famcat <- ceiling(p3/3)
+  family <- 1+5*famcat+4*(famcat%%2)
+  inccat <- p3-3*(famcat-1)
+  links  <- cbind(region, ru, house, famcat, family,inccat)
+  ph <- as.data.table(cbind(pop,links,ahsvars,recsvars))
+  return(ph)
 } 
 
 
@@ -162,7 +173,7 @@ prepare.ahs = function(filepath=NULL) {
   z$sewdis  <- sewdis
   z$water   <- water
   z$waterd  <- waterd
- 
+  
   hemahs <- as.data.table(select(z,pool,afuel,baths,bedrms,built,cars,cellar,hequip,lot,pwt,rooms,sewdis,unitsf,water,waterd,control))
   sahs <- setorder(hemahs,pool)  
   path <- getwd()
@@ -173,7 +184,7 @@ prepare.ahs = function(filepath=NULL) {
 
 
 prepare.recs = function(filename=NULL) {
-  if (is.null(filename)) filename <- filename <- paste0(files$inpath,files$rawRECS)
+  if (is.null(filename)) filename <- paste0(files$inpath,files$rawRECS)
   allrecs <- fread(filename)  
   setnames(allrecs,names(allrecs),tolower(names(allrecs)))
   r <- select(allrecs,agehhmemcat2,agehhmemcat3,agehhmemcat4,agehhmemcat5,agehhmemcat6,agehhmemcat7,agehhmemcat8,
