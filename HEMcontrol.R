@@ -12,7 +12,7 @@ HEM.setup = function(wd=NULL) {
   inpath   <- paste0(wd,"/input/")
   outpath  <- paste0(wd,"/output/")
   run      <- "runfile.txt"
-  HEMpums  <- "HEMpums2.csv"
+  HEMpums  <- "HEMpums.csv"
   HEMahs   <- "HEMahs.csv"
   HEMrecs  <- "HEMrecs.csv"
   states   <- "states.txt"
@@ -38,10 +38,10 @@ HEM.setup = function(wd=NULL) {
   library("msm")
   library("truncnorm")
   library("survey")
-  source("HEMcontrol3.R")
-  source("HEMpopgen3.R")
-  source("httkpop3.R")
-  source("HEMhousing2.R")
+  source("HEMcontrol.R")
+  source("HEMpopgen.R")
+  source("httkpop2.R")
+  source("HEMhousing.R")
 }    
 
 
