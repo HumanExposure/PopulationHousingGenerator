@@ -1,7 +1,8 @@
 
+
 # Source code for EPA's HEM population generator module
 # Designed and written by WGG at ICF 
-# Last modified on November 17, 2016
+# Last modified on September 15, 2017
 
 
 popgen = function (runfile=NULL) {
@@ -9,9 +10,10 @@ popgen = function (runfile=NULL) {
   # HEM.setup()
   if(!is.null(runfile)) specs <- read.popfile(runfile)
   if(is.null(runfile))  specs <- read.console()
-  specs$var.list <- c("pums","months","nkde","hw1","hw2","ahs","recs")
+  specs$var.list <- c("pums","ahs","recs","months","nkde","hw1","hw2","norm","logn","flow","adip")
   specs$seeds    <- get.seeds(specs$run.seed,length(specs$var.list))
   g       <<- specs
+  cat("Saved run settings")
   pums1    <- read.pums()
   sel.pop  <- gen.pop(pums1)
   pop0     <- pums1[sel.pop]
@@ -21,11 +23,13 @@ popgen = function (runfile=NULL) {
   indiv_dt <- tissue_masses_flows(tmf_dt = indiv_dt)
   indiv_dt <- estimate_hematocrit(hcttmp_dt = indiv_dt)
   indiv_dt <- estimate_gfr(gfrtmp.dt = indiv_dt)
-  indiv_dt[, `:=`(bmi_adj, weight_adj/((height/100)^2))]
-  indiv_dt[, `:=`(bmi,     weight/((height/100)^2))]
-  indiv_dt[, `:=`(BSA, body_surface_area(weight, height, age_years))]
-  indiv_dt <- setorder(indiv_dt,num)
+  indiv_dt[, `:=` (bmi_adj, weight_adj/((height/100)^2))]
+  indiv_dt[, `:=` (bmi,     weight/((height/100)^2))]
+  indiv_dt[, `:=` (BSA, body_surface_area(weight, height, age_years))]
+  indiv_dt[, `:=` (age_years,  age)]
+  indiv_dt[, `:=` (age_months, temp_age_months)]  
   indiv_dt <- adjust_weight(y = indiv_dt)
+  indiv_dt <- setorder(indiv_dt,num)
   return(indiv_dt)
 }
 
@@ -57,6 +61,7 @@ read.popfile = function(popfile){
     if (str_trim(a$V1[i])=="ethnicity")      ethnicity     <- c(str_trim(a$V2[i]))
     if (str_trim(a$V1[i])=="race")           race          <- c(str_trim(a$V2[i]))
     if (str_trim(a$V1[i])=="run.seed")       run.seed      <- as.integer(a$V2[i])
+    if (str_trim(a$V1[i])=="regions")        regions       <- splitpairs(a$V2[i])
     if (str_trim(a$V1[i])=="states")         states        <- splitpairs(a$V2[i])
   }
   
@@ -82,14 +87,20 @@ read.popfile = function(popfile){
   if (str_detect(race,"P"))  b <- c(b,"P")
   if (str_detect(race,"O"))  b <- c(b,"O")
   race.list <- b[2:length(b)]
-  if (states[1]=="") states = c(allstates$FIPS)
+  if (regions[1]=="" & states[1]=="") states = c(allstates$FIPS)
+  if (str_detect(regions,"1")) states <- c(states,allstates$FIPS[allstates$region=="1"])
+  if (str_detect(regions,"2")) states <- c(states,allstates$FIPS[allstates$region=="2"])
+  if (str_detect(regions,"3")) states <- c(states,allstates$FIPS[allstates$region=="3"])    
+  if (str_detect(regions,"4")) states <- c(states,allstates$FIPS[allstates$region=="4"])
+  states <- unique(states[order(states)])
+  states <- states[states!=""]
   
   if (num.persons<=0)          stop("\n No persons to model \n")
   if (is.null(gender.list))    stop("\n No gender selected \n")
   if (is.null(ethnicity.list)) stop("\n No ethnicity selected \n")
   if (is.null(race.list))      stop("\n No race selected \n")
   if (max.age<min.age)         stop("\n Max age < min age \n")
-
+  
   
   cat("\n")
   cat("run.name      =",run.name,"\n")
@@ -187,11 +198,20 @@ read.console = function() {
   }  
   filename  <- paste0(files$inpath,files$states)
   allstates <- fread(filename,colClasses = "character")
+  rg  <- readline("Enter list of region codes:")
+  rg2 <- str_replace_all(rg, "[ .,]", "")
+  rg3 <- string.values(rg2)
   st  <- readline("Enter list of state FIPS codes:") 
   st2 <- str_replace_all(st, "[ .,]", "")
-  st3 <- splitpairs(st2)
-  if (st3[1]=="") st3 <- c(allstates$FIPS)  
-
+  st3 <- string.values(st2)
+  if (rg3=="" & st3[1]=="") st3 <- c(allstates$FIPS) 
+  if (str_detect(rg3,"1"))  st3 <- c(st3,allstates$FIPS[allstates$region=="1"])
+  if (str_detect(rg3,"2"))  st3 <- c(st3,allstates$FIPS[allstates$region=="2"])
+  if (str_detect(rg3,"3"))  st3 <- c(st3,allstates$FIPS[allstates$region=="3"])    
+  if (str_detect(rg3,"4"))  st3 <- c(st3,allstates$FIPS[allstates$region=="4"])
+  st4    <- unique(st3[order(st3)])
+  states <- st4[st4!=""]
+  
   specs <- list(
     run.name       = run.name,
     num.persons    = num.persons,
@@ -201,20 +221,20 @@ read.console = function() {
     ethnicity      = ethnicity,
     race           = race,
     run.seed       = run.seed,
-    states         = st3)
+    states         = states)
   return(specs)
 }
 
 
 
 get.seeds = function(init.seed,num) {
-  n <- 2*num  
-  base <- mpfr(2147483647, precBits = 128)
-  mult <- mpfr(39720409, precBits = 128)
+  n     <- 2*num
+  base  <- as.integer64(2147483647)
+  mult  <- as.integer64(397204094)
   seeds <- vector("integer",n)
-  x <- mpfr(init.seed, precBits = 128)
+  x     <- as.integer64(init.seed)
   for (i in 1:n) {
-    x <- (x*mult) %% base
+    x <- (x * mult) %% base
     seeds[i] <- as.numeric(x)
   }
   return(seeds)
@@ -246,6 +266,15 @@ splitpairs = function(str) {
 
 
 
+string.values = function(x){
+  y <- str_replace_all(x,","," ")
+  w <- lapply(str_split(y," "),as.numeric)[[1]]
+  v <- w[!is.na(w)]
+  return(v)
+}
+
+
+
 cumul.prob = function(x) {
   if (min(x)<0) cat("Negative values in probability vector")
   y <- cumsum(x)
@@ -256,7 +285,7 @@ cumul.prob = function(x) {
 
 read.pums = function() {
   filename <- paste0(files$inpath,files$HEMpums)
-  if(!exists("pums")) pums <- fread(filename,colClasses = c(rep("character",5),rep("numeric",4),rep("character",2)))
+  if(!exists("pums")) pums <- fread(filename,colClasses = c(rep("character",5),rep("numeric",4),rep("character",2),"numeric"))
   pums[, `:=`(state, substr(compid,1,2))]
   x <- pums[pums$state %in% g$states]
   y <- x[x$age>=g$min.age & x$age<=g$max.age]
@@ -286,7 +315,8 @@ httkvars = function(p) {
   q[, `:=` (reth, as.factor(reths[nreth]))]
   q.months <- get.randoms("months",nrow(q),g$seeds,g$var.list,0)
   q[, `:=` (age_months,12*q$age+floor(12*q.months))]
-  setnames(q,"age","age_years")
+  q[, `:=` (temp_age_months,12*q$age+floor(12*q.months))]
+  q[, `:=` (age_years, age)]
   q$gender[q$gender=="M"] <- "Male"
   q$gender[q$gender=="F"] <- "Female"
   q[, `:=` (num,1:nrow(q))]
