@@ -16,6 +16,7 @@
 
 # RStudio files
 .Rproj.user/
+*.Rproj
 
 # produced vignettes
 vignettes/*.html
@@ -34,6 +35,6 @@ vignettes/*.pdf
 .Rproj.user
 
 ##not including /input and /output directories
-/input/
+/input/hempums.csv
 /output/
 # test

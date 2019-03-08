@@ -1,0 +1,52 @@
+FIPS, region, name
+01,3,Alabama
+02,4,Alaska
+04,4,Arizona
+05,3,Arkansas
+06,4,California
+08,4,Colorado
+09,1,Connecticut
+10,3,Delaware
+11,3,District of Columbia
+12,3,Florida
+13,3,Georgia
+15,4,Hawaii
+16,4,Idaho
+17,2,Illinois
+18,2,Indiana
+19,2,Iowa
+20,2,Kansas
+21,3,Kentucky
+22,3,Louisiana
+23,1,Maine
+24,3,Maryland
+25,1,Massachusetts
+26,2,Michigan
+27,2,Minnesota
+28,3,Mississippi
+29,2,Missouri
+30,4,Montana
+31,2,Nebraska
+32,4,Nevada
+33,1,New Hampshire
+34,1,New Jersey
+35,4,New Mexico
+36,1,New York
+37,3,North Carolina
+38,2,North Dakota
+39,2,Ohio
+40,3,Oklahoma
+41,4,Oregon
+42,1,Pennsylvania
+44,1,Rhode Island
+45,3,South Carolina
+46,2,South Dakota
+47,3,Tennessee
+48,3,Texas
+49,4,Utah
+50,1,Vermont
+51,3,Virginia
+53,4,Washington
+54,3,West Virginia
+55,2,Wisconsin
+56,4,Wyoming
