@@ -1,13 +1,13 @@
 # Control file for EPA's HEM model
 # Designed and written for EPA by WGG of ICF
-# Last modified Nov 17, 2016
+# Last modified September 26, 2017
 
 
 HEM.setup = function(wd=NULL) {
   # WD is the working directory, assumed to be one level up from the R,
   # input, and output directories. File path names are relative to this.
   # The default value below should be adjusted for each installation.
-  if(is.null(wd)) wd <- "L:/Lab/HEM/Population Residential Generator/R/HEM_POP"
+  if(is.null(wd)) wd <- "C:/main/HEM/code/forGitHub"
   setwd(wd)
   inpath   <- paste0(wd,"/input/")
   outpath  <- paste0(wd,"/output/")
@@ -24,7 +24,7 @@ HEM.setup = function(wd=NULL) {
   f        <- as.list(c(wd,inpath,outpath,run,HEMpums,HEMahs,HEMrecs,states,rawAHSh,rawAHSp,rawRECS,outP,outPH))
   names(f) <- c("wd","inpath","outpath","run","HEMpums","HEMahs","HEMrecs","states","rawAHSh","rawAHSp","rawRECS","outP","outPH")
   files   <<- f
-
+  
   suppressPackageStartupMessages(TRUE)
   # Load required packages and source all code modules.
   library("data.table")
@@ -33,12 +33,11 @@ HEM.setup = function(wd=NULL) {
   library("dplyr")
   library("dtplyr")
   library("ggplot2")
-  library("Rmpfr")
+  library("bit64")
   library("httk")
   library("msm")
   library("truncnorm")
   library("survey")
-  library("httkpop")
   source("HEMcontrol.R")
   source("HEMpopgen.R")
   source("httkpop2.R")

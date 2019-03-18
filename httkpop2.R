@@ -1,7 +1,7 @@
 
 # Source code for physiology, part of EPA's HEM population generator module
-# Designed and written by WGG at ICF 
-# Last modified on November 17, 2016
+# Designed and written by WGG at ICF, based on httkpop code developed at EPA 
+# Last modified on September 15, 2017
 
 
 gen_height_weight = function(hbw_dt,specs) {
@@ -10,6 +10,9 @@ gen_height_weight = function(hbw_dt,specs) {
   id <- weight <- NULL
   logbw_resid <- height <- logh_resid <- NULL
   hbw_dt <- data.table::copy(hbw_dt)
+  hbw_dt[, `:=`(age, age_years)]
+  hbw_dt[, `:=`(age_years, pmin(age_years,79))]
+  hbw_dt[, `:=`(age_months,pmin(age_months,79*12))]    # cap age at 79 years
   hbw_dt[, `:=`(mean_logh,  predict(spline_heightweight[g == gender & r == reth, height_spline][[1]], x = age_months)$y), by = list(gender, reth)]
   hbw_dt[, `:=`(mean_logbw, predict(spline_heightweight[g == gender & r == reth, weight_spline][[1]], x = age_months)$y), by = list(gender, reth)]
   spline_kde <- spline_heightweight[, list(g, r, hw_kde, nkde)]
@@ -20,9 +23,9 @@ gen_height_weight = function(hbw_dt,specs) {
   hbw_dt[, `:=`(q.hw1,  get.randoms("hw1", nrow(hbw_dt),specs$seeds,specs$var.list,0))] 
   hbw_dt[, `:=`(q.hw2,  get.randoms("hw2", nrow(hbw_dt),specs$seeds,specs$var.list,0))]
   hbw_dt[, `:=`(c("logbw_resid", "logh_resid"), as.data.frame(hw_kde[[1]]$x[sampleq(unique(nkde), hw_kde[[1]]$w, q.nkde), ] 
-                + bi_norm_cor(cbind(q.hw1,q.hw2), mean=c(0, 0), sigma=hw_kde[[1]]$H))), by = list(gender, reth)]
-  hbw_dt[, `:=`(weight, exp(mean_logbw + logbw_resid))]
-  hbw_dt[, `:=`(height, exp(mean_logh + logh_resid))]
+                                                              + bi_norm_cor(cbind(q.hw1,q.hw2), mean=c(0, 0), sigma=hw_kde[[1]]$H))), by = list(gender, reth)]
+  hbw_dt[, `:=`(weight, pmin(exp(mean_logbw + logbw_resid),160))]   # cap at 160 kg
+  hbw_dt[, `:=`(height, pmin(exp(mean_logh + logh_resid),225))]     # cap at 225 cm
   hbw_dt[, `:=`(id, NULL)]
   hbw_dt[, `:=`(hw_kde, NULL)]
   hbw_dt[, `:=`(nkde, NULL)]
@@ -56,13 +59,15 @@ tissue_masses_flows = function (tmf_dt)
   tmp_dt[, `:=`(mass_mean, tissue_scale(height_ref = height_ref, height_indiv = height, tissue_mean_ref = mass_ref))]
   tmp_dt[tissue == "Brain", `:=`(mass_mean, brain_mass(gender = gender, age_years = age_years))]
   tmp_dt[tissue == "Bone", `:=`(mass_mean, bone_mass_age(age_years = age_years, 
-                                age_months = age_months, height = height, weight = weight, gender = gender))]
+                                                         age_months = age_months, height = height, weight = weight, gender = gender))]
   bone_mass_mean <- tmp_dt[tissue == "Bone", list(id, mass_mean)]
   setnames(bone_mass_mean, "mass_mean", "bonemass_mean")
   tmp_dt <- merge(tmp_dt, bone_mass_mean, by = ("id"))
   tmp_dt[tissue == "Skeleton", `:=`(mass_mean, bonemass_mean/0.5)]
   tmp_dt[, `:=`(bonemass_mean, NULL)]
   rm(bone_mass_mean)
+  tmp_dt[, `:=` (q.norm, get.randoms("norm",nrow(tmp_dt),g$seeds,g$var.list,0))] 
+  tmp_dt[, `:=` (q.logn, get.randoms("logn",nrow(tmp_dt),g$seeds,g$var.list,0))] 
   tmp_dt[tissue == "Muscle", `:=`(mass_mean, skeletal_muscle_mass(smm = mass_mean, age_years = age_years, height = height, gender = gender))]
   tmp_dt[tissue == "Liver" & age_years <= 18, `:=`(mass_mean, liver_mass_children(height = height, weight = weight, gender = gender))]
   tmp_dt[tissue == "Kidney" & age_years <= 18, `:=`(mass_mean, kidney_mass_children(weight = weight, height = height, gender = gender))]
@@ -73,17 +78,17 @@ tissue_masses_flows = function (tmf_dt)
   tmp_dt[tissue == "Skin", `:=`(mass_mean, skin_mass_bosgra(BSA = BSA))]
   tmp_dt[tissue == "Blood", `:=`(mass_mean, blood_weight(BSA = BSA/(100^2), gender = gender))]
   tmp_dt[tissue == "Blood" & mass_mean < 0.2, `:=`(mass_mean, blood_mass_correct(blood_mass = mass_mean, age_months = age_months, 
-                                                  age_years = age_years, gender = gender, weight = weight))]
-  tmp_dt[mass_dist == "Normal", `:=`(mass, truncnorm::rtruncnorm(n = length(mass_dist), a = 0, mean = mass_mean, sd = mass_cv * mass_mean))]
-  tmp_dt[mass_dist == "Log-normal", `:=`(mass, exp(rnorm(n = length(mass_dist), mean = log(mass_mean), sd = sqrt(log(mass_cv^2 + 1)))))]
+                                                                                 age_years = age_years, gender = gender, weight = weight))]
+  tmp_dt[mass_dist == "Normal", `:=`(mass, truncnorm::qtruncnorm(q.norm, a = 0, mean = mass_mean, sd = mass_cv * mass_mean))]
+  tmp_dt[mass_dist == "Log-normal", `:=`(mass, exp(rnorm(q.logn, mean = log(mass_mean), sd = sqrt(log(mass_cv^2 + 1)))))]
   tmp_dt[tissue == "CO", `:=`(flow_mean, tissue_scale(height_ref = height_ref, height_indiv = height,
-                                                       tissue_mean_ref = 1.05 * flow_ref) * (1 - max(0, 0.005 * (age_years - 25))))]
+                                                      tissue_mean_ref = 1.05 * flow_ref) * (1 - max(0, 0.005 * (age_years - 25))))]
   CO_flow_mean <- tmp_dt[tissue == "CO", list(id, flow_mean)]
   setnames(CO_flow_mean, "flow_mean", "CO_flow_mean")
   tmp_dt <- merge(tmp_dt, CO_flow_mean, by = "id", allow.cartesian = TRUE)
   tmp_dt[tissue != "CO", `:=`(flow_mean, flow_frac * CO_flow_mean)]
-  tmp_dt[tissue != "CO" & tissue != "Lung" & !is.na(flow_mean), 
-         `:=`(flow, truncnorm::rtruncnorm(n = length(flow_mean), a = 0, mean = flow_mean, sd = flow_cv * flow_mean))]
+  tmp_dt[, `:=` (q.flow, get.randoms("flow",nrow(tmp_dt),g$seeds,g$var.list,0))] 
+  tmp_dt[tissue != "CO" & tissue != "Lung" & !is.na(flow_mean),`:=`(flow, truncnorm::qtruncnorm(q.flow, a=0, mean=flow_mean, sd=flow_cv*flow_mean))]
   tmp_dt[tissue == "Lung", `:=`(flow, flow_frac * CO_flow_mean)]
   tmp_dt[tissue == "CO", `:=`(flow, CO_flow_mean)]
   mass_cast <- data.table::dcast.data.table(tmp_dt, id ~ tissue, value.var = "mass")
@@ -100,8 +105,9 @@ tissue_masses_flows = function (tmf_dt)
   tmf_dt <- merge(tmf_dt, flow_cast, by = "id")
   tmf_dt[, `:=`(Other_mass, (0.033 + 0.014) * weight)]
   tmf_dt[, `:=`(org_mass_sum, org_mass_sum + Other_mass)]
-  tmf_dt[(weight - org_mass_sum) > 1, `:=`(Adipose_mass, exp(rnorm(n = length(weight), mean = log(weight - org_mass_sum), 
-                                                                   sd = sqrt(log(0.42^2 + 1)))))]
+  tmf_dt[, `:=`(q.adip, get.randoms("adip",nrow(tmf_dt),g$seeds,g$var.list,0))] 
+  #tmf_dt[(weight - org_mass_sum) > 1, `:=`(Adipose_mass, exp(rnorm(tmp_dt$q.adip, mean = log(weight-org_mass_sum), sd = sqrt(log(0.42^2 + 1)))))]
+  tmf_dt[, `:=`(Adipose_mass, exp(rnorm(q.adip, mean = log(pmax(1,weight-org_mass_sum)), sd = sqrt(log(0.42^2 + 1)))))]
   tmf_dt[(weight - org_mass_sum) <= 1, `:=`(Adipose_mass, 0)]
   tmf_dt[, `:=`(org_flow_check, Reduce("+", .SD)), .SDcols = names(flow_cast)[!(names(flow_cast) %in% c("CO_flow", "id"))]]
   tmf_dt[, `:=`(org_flow_check, org_flow_check/CO_flow)]
@@ -116,7 +122,7 @@ tissue_masses_flows = function (tmf_dt)
   tmf_dt[, `:=`(million.cells.per.gliver, exp(rnorm(n = nrow(tmf_dt), mean = mu, sd = sigma)))]
   setnames(tmf_dt, c("Kidney_mass", "Kidney_flow", "CO_flow"), c("Kidneys_mass", "Kidneys_flow", "CO"))
   tmf_dt[, `:=`(id, NULL)]
-  tmf_dt[, `:=`(org_mass_sum, NULL)]
+  # tmf_dt[, `:=`(org_mass_sum, NULL)]
   return(tmf_dt)
 }
 
@@ -239,7 +245,7 @@ skeletal_muscle_mass = function (smm, age_years, height, gender)
   smm[gender=="Male"   & age_years>18] <- smm[gender=="Male"   & age_years>18] - 0.001*age_years[gender=="Male"   & age_years>18]^2
   smm[gender=="Female" & age_years>18] <- smm[gender=="Female" & age_years>18] - 0.001*age_years[gender=="Female" & age_years>18]^2
   smm[gender=="Male"  & age_years<=18] <- skeletal_muscle_mass_children(gender = "Male", 
-                                                                           age_years = age_years[gender == "Male" & age_years <= 18])
+                                                                        age_years = age_years[gender == "Male" & age_years <= 18])
   smm[gender == "Female" & age_years <= 18] <- skeletal_muscle_mass_children(gender = "Female", 
                                                                              age_years = age_years[gender == "Female" & age_years <= 18])
   return(smm)
@@ -287,9 +293,9 @@ kidney_mass_children = function (weight, height, gender)
 {
   km <- rep(NA, length(weight))
   km[gender == "Male"] <- (10.24 * (height[gender == "Male"]/100) * sqrt(weight[gender == "Male"]) + 7.85) + 
-                            (9.88 * (height[gender == "Male"]/100) * sqrt(weight[gender == "Male"]) + 7.2)
+    (9.88 * (height[gender == "Male"]/100) * sqrt(weight[gender == "Male"]) + 7.2)
   km[gender == "Female"] <- (10.65 * (height[gender == "Female"]/100) * sqrt(weight[gender == "Female"]) + 6.11) + 
-                              (9.88 * (height[gender == "Female"]/100) * sqrt(weight[gender == "Female"]) + 6.55)
+    (9.88 * (height[gender == "Female"]/100) * sqrt(weight[gender == "Female"]) + 6.55)
   return(km/1000)
 }
 
@@ -319,7 +325,7 @@ lung_mass_children = function (height, weight, gender)
 {
   lm <- rep(NA, length(gender))
   lm[gender == "Male"] <- ((29.08 * height[gender == "Male"]/100 * sqrt(weight[gender == "Male"]) + 11.06) + 
-                              (35.47 * height[gender == "Male"]/100 * sqrt(weight[gender == "Male"]) + 5.53))/1000
+                             (35.47 * height[gender == "Male"]/100 * sqrt(weight[gender == "Male"]) + 5.53))/1000
   lm[gender == "Female"] <- ((31.46 * height[gender == "Female"]/100 * sqrt(weight[gender == "Female"]) + 1.43) + 
                                (35.3 * height[gender == "Female"]/100 * sqrt(weight[gender == "Female"]) + 1.53))/1000
   return(lm)
@@ -364,7 +370,7 @@ estimate_gfr = function (gfrtmp.dt)
                                                            "reth"))
   if (gfrtmp.tmp[, any(age_years >= 12)]) {
     gfrtmp.tmp[age_years >= 12, `:=`(log_serum_creat, predict(sc_spline[[1]], x = age_months)$y +
-                                     rfun(n = sum(age_years >= 12), fhat = sc_kde[[1]])), by = list(gender, reth)]
+                                       rfun(n = sum(age_years >= 12), fhat = sc_kde[[1]])), by = list(gender, reth)]
     gfrtmp.dt <- merge(gfrtmp.dt, gfrtmp.tmp[, list(id, log_serum_creat)], by = "id")
     gfrtmp.dt[, `:=`(id, NULL)]
     gfrtmp.dt[age_years >= 12, `:=`(serum_creat, exp(log_serum_creat))]
@@ -417,7 +423,7 @@ estimate_hematocrit = function (hcttmp_dt)   {
                                                            "reth"))
   if (hcttmp_tmp[, any(age_years >= 1)]) {
     hcttmp_tmp[age_years >= 1, `:=`(log_hematocrit, predict(hct_spline[[1]], x = age_months)$y + 
-                                    rfun(n = sum(age_years >= 1), fhat = hct_kde[[1]])), by = list(gender, reth)]
+                                      rfun(n = sum(age_years >= 1), fhat = hct_kde[[1]])), by = list(gender, reth)]
     hcttmp_dt <- merge(hcttmp_dt, hcttmp_tmp[, list(id, log_hematocrit)], by = "id")
     hcttmp_dt[, `:=`(id, NULL)]
     hcttmp_dt[age_years >= 1, `:=`(hematocrit, exp(log_hematocrit))]
