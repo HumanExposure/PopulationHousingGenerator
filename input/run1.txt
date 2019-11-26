@@ -1,0 +1,10 @@
+Variable,        value
+run.name       = run1
+num.persons    = 100000
+min.age        = 0
+max.age        = 99
+gender         = FM 
+ethnicity      = NMO
+race           = WBNAPO
+run.seed       = 86
+states         = 37 51
