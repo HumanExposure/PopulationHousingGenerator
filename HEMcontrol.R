@@ -38,7 +38,6 @@ HEM.setup = function(wd=NULL) {
   library("msm")
   library("truncnorm")
   library("survey")
-  source("HEMcontrol.R")
   source("HEMpopgen.R")
   source("httkpop2.R")
   source("HEMhousing.R")
