@@ -285,7 +285,7 @@ cumul.prob = function(x) {
 
 read.pums = function() {
   filename <- paste0(files$inpath,files$HEMpums)
-  if(!exists("pums")) pums <- fread(filename,colClasses = c(rep("character",5),rep("numeric",4),rep("character",2),"numeric"))
+  if(!exists("pums")) pums <- fread(filename,colClasses = c(rep("character",5),rep("numeric",4),rep("character",2)))
   pums[, `:=`(state, substr(compid,1,2))]
   x <- pums[pums$state %in% g$states]
   y <- x[x$age>=g$min.age & x$age<=g$max.age]
