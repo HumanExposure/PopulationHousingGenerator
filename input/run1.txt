@@ -7,4 +7,5 @@ gender         = FM
 ethnicity      = NMO
 race           = WBNAPO
 run.seed       = 86
+regions        = 3
 states         = 37 51
