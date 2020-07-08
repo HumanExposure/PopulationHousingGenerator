@@ -21,4 +21,4 @@ In addition, processed versions of data for RECS and AHS are included as default
 RPGen utilizes tools from the R package httk to link physiological parameters to sampled individuals. However, it no longer requires httkpop.tar.gz datafile, as the httk package is freely avaialble from CRAN. 
 
 RPG was originally written by GG at ICF. This version includes information submitted to EPA in August 2019. 
-Additional updates to RPGen are forthcoming.
+Additional updates to RPGen are forthcoming, including an automatic download function and process function.  
